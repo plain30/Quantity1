@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>단가조사</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; }
+  body { display: flex; flex-direction: column; background: #f4f8f4; color: #222; }
+  header { background: linear-gradient(135deg, #166534, #15803d); color: white; padding: 12px 20px; box-shadow: 0 2px 6px rgba(0,0,0,.15); flex-shrink: 0; }
+  header h1 { margin: 0 0 4px 0; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  header .sub { font-size: 12px; opacity: .85; }
+  .top-controls { margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .book-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; width: 100%; flex-wrap: wrap; }
+  .book-label { font-size: 11px; opacity: .9; margin-right: 4px; font-weight: 700; }
+  .book-btn { padding: 7px 14px; background: rgba(255,255,255,.1); color: white; border: 2px solid rgba(255,255,255,.35); border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 700; }
+  .book-btn.active { background: #bbf7d0; color: #14532d; border-color: #bbf7d0; }
+  .cat-btn { padding: 5px 10px; background: rgba(255,255,255,.08); color: white; border: 1px solid rgba(255,255,255,.3); border-radius: 5px; cursor: pointer; font-size: 11px; font-weight: 600; }
+  .cat-btn.active { background: #fff; color: #15803d; border-color: #fff; }
+  .search-bar { flex: 1; min-width: 220px; display: flex; gap: 8px; align-items: center; margin-left: auto; }
+  .search-bar input { flex: 1; padding: 8px 12px; border: none; border-radius: 6px; font-size: 14px; outline: none; }
+  .search-bar .count { background: rgba(255,255,255,.2); padding: 6px 10px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
+  .back-btn { padding: 6px 12px; background: rgba(255,255,255,.18); color: white; border: 1px solid rgba(255,255,255,.4); border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-block; }
+  .back-btn:hover { background: rgba(255,255,255,.3); }
+  main { display: flex; flex: 1; min-height: 0; }
+  #sidebar { width: 380px; flex-shrink: 0; background: white; border-right: 1px solid #d8dce3; overflow-y: auto; padding: 0; }
+  .chapter-divider { background: #166534; color: white; padding: 8px 14px; font-size: 13px; font-weight: 700; position: sticky; top: 0; z-index: 5; }
+  #sidebar .item { padding: 8px 14px; border-bottom: 1px solid #eef0f3; cursor: pointer; display: flex; gap: 8px; align-items: center; transition: background .12s; }
+  #sidebar .item:hover { background: #e6f7eb; }
+  #sidebar .item.active { background: #d1fadf; border-left: 4px solid #15803d; padding-left: 10px; }
+  #sidebar .id { flex-shrink: 0; font-weight: 700; color: #15803d; font-size: 12px; min-width: 50px; }
+  #sidebar .title { font-size: 12px; flex: 1; line-height: 1.4; }
+  #sidebar .item.hidden, .chapter-divider.hidden { display: none; }
+  #viewer { flex: 1; overflow-y: auto; background: #3a4a3f; padding: 20px; min-width: 0; padding-right: 200px; }
+  #viewer .placeholder { color: #cdd2db; text-align: center; margin-top: 60px; font-size: 16px; }
+  #viewer .page-block { margin-bottom: 14px; text-align: center; }
+  #viewer .page-label { color: #fff; font-size: 11px; margin-bottom: 4px; text-align: center; background: rgba(0,0,0,.25); display: inline-block; padding: 2px 8px; border-radius: 4px; }
+  #viewer .page-wrapper { position: relative; display: inline-block; max-width: var(--page-max-w, 64%); box-shadow: 0 4px 16px rgba(0,0,0,.4); border-radius: 4px; overflow: hidden; background: white; line-height: 0; transition: box-shadow .2s, max-width .15s; }
+  #viewer .page-wrapper.active-anno { box-shadow: 0 0 0 3px #f7c948, 0 4px 16px rgba(0,0,0,.4); }
+  #viewer .page-wrapper img { display: block; width: 100%; height: auto; }
+  #viewer .page-wrapper canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  body[data-tool="pen"] #viewer .page-wrapper canvas { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'><circle cx='9' cy='9' r='2.5' fill='%23222'/><circle cx='9' cy='9' r='3.5' fill='none' stroke='%23fff' stroke-width='1'/></svg>") 9 9, crosshair; }
+  body[data-tool="highlighter"] #viewer .page-wrapper canvas { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><rect x='4' y='4' width='16' height='16' fill='%23fff066' stroke='%23222' stroke-width='1'/><rect x='4' y='4' width='16' height='4' fill='%23222'/></svg>") 12 12, crosshair; }
+  body[data-tool="eraser"] #viewer .page-wrapper canvas { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'><rect x='3' y='9' width='22' height='12' fill='%23ffc8d3' stroke='%23222' stroke-width='1' rx='2'/><rect x='17' y='9' width='8' height='12' fill='%23f59ab1' stroke='%23222' stroke-width='1' rx='2'/></svg>") 14 14, crosshair; }
+  body[data-tool="none"] #viewer .page-wrapper canvas { pointer-events: none; cursor: default; }
+  #viewer .section-header { background: #fff; color: #166534; padding: 12px 16px; border-radius: 6px; margin-bottom: 14px; font-size: 15px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,.15); max-width: var(--page-max-w, 64%); margin-left: auto; margin-right: auto; transition: max-width .15s; }
+  #viewer .section-header .sec-id { color: #15803d; margin-right: 10px; }
+  .no-results { padding: 30px 20px; text-align: center; color: #8893a4; font-size: 13px; }
+  .nav-arrow { position: fixed; top: 50%; transform: translateY(-50%); width: 52px; height: 84px; background: rgba(22,101,52,.8); color: #fff; border: none; border-radius: 10px; cursor: pointer; font-size: 28px; font-weight: 700; box-shadow: 0 4px 14px rgba(0,0,0,.4); z-index: 8000; display: flex; align-items: center; justify-content: center; transition: background .15s, transform .15s; }
+  .nav-arrow:hover:not(:disabled) { background: #15803d; transform: translateY(-50%) scale(1.08); }
+  .nav-arrow:disabled { opacity: .25; cursor: not-allowed; }
+  .nav-arrow.prev { left: 388px; }
+  .nav-arrow.next { right: 198px; }
+  .nav-arrow .lbl { display: block; font-size: 9px; font-weight: 600; margin-top: 2px; letter-spacing: 0.5px; }
+  .float-toolbar { position: fixed; top: 50%; right: 14px; transform: translateY(-50%); background: rgba(255,255,255,.97); padding: 12px 10px; border-radius: 10px; box-shadow: 0 6px 24px rgba(0,0,0,.35); display: flex; flex-direction: column; gap: 8px; z-index: 9999; width: 170px; font-size: 12px; border: 1px solid rgba(0,0,0,.08); }
+  .float-toolbar .ft-collapse { background: #e6f7eb; border: 1px solid #a7e7b9; cursor: pointer; font-size: 13px; color: #166534; padding: 3px 8px; width: auto; align-self: flex-end; border-radius: 5px; line-height: 1.2; margin-bottom: -2px; }
+  .float-toolbar .ft-header { font-weight: 700; color: #166534; text-align: center; font-size: 13px; margin-bottom: 2px; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+  .float-toolbar.collapsed { width: auto; padding: 6px 8px; flex-direction: row; align-items: center; gap: 8px; }
+  .float-toolbar.collapsed > *:not(.ft-collapse):not(.ft-header) { display: none; }
+  .float-toolbar.collapsed .ft-header { border: none; margin: 0; padding: 0; }
+  .float-toolbar .lbl { color: #555; font-weight: 700; font-size: 11px; text-align: center; }
+  .float-toolbar .swatch-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; justify-items: center; }
+  .float-toolbar .swatch { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; border: 2px solid #fff; box-shadow: 0 0 0 1px #aaa; transition: transform .1s; }
+  .float-toolbar .swatch:hover { transform: scale(1.1); }
+  .float-toolbar .swatch.active { box-shadow: 0 0 0 3px #15803d; transform: scale(1.18); }
+  .float-toolbar select, .float-toolbar button.tool { font-size: 12px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 5px; cursor: pointer; background: #fff; font-family: inherit; width: 100%; }
+  .float-toolbar button.tool:hover { background: #e6f7eb; }
+  .float-toolbar .tool.active { background: #d1fadf; border-color: #15803d; font-weight: 700; }
+  .float-toolbar .opacity-wrap { display: flex; align-items: center; gap: 6px; }
+  .float-toolbar .zoom-btn { width: 24px; height: 24px; padding: 0; border: 1px solid #a7e7b9; background: #e6f7eb; color: #166534; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: 700; line-height: 1; font-family: inherit; }
+  .float-toolbar .zoom-btn:hover { background: #d1fadf; }
+  .float-toolbar input[type="range"] { flex: 1; width: auto; margin: 0; }
+  .float-toolbar .op-val { font-weight: 700; color: #166534; }
+  .float-toolbar hr { border: none; border-top: 1px solid #e0e0e0; margin: 2px 0; }
+  .float-toolbar .hint { font-size: 10px; color: #555; text-align: left; line-height: 1.4; padding: 5px 6px; background: #f3faf5; border-radius: 4px; }
+  .float-toolbar .hint b { color: #166534; }
+  .page-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; z-index: 20; line-height: normal; }
+  .page-actions button { background: rgba(255,255,255,.95); border: 1px solid #aaa; border-radius: 5px; padding: 5px 10px; font-size: 12px; cursor: pointer; font-family: inherit; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  .page-actions button:hover { background: #e6f7eb; }
+  .page-actions .dl-btn { background: #15803d; color: white; border-color: #15803d; font-weight: 700; }
+  .page-actions .dl-btn:hover { background: #166534; }
+  #sidebar::-webkit-scrollbar, #viewer::-webkit-scrollbar { width: 10px; }
+  #sidebar::-webkit-scrollbar-thumb { background: #bcc3d0; border-radius: 5px; }
+  #viewer::-webkit-scrollbar-thumb { background: #6b7180; border-radius: 5px; }
+</style>
+</head>
+<body data-tool="none">
+<header>
+  <h1>🔍 단가조사</h1>
+  <div class="sub">총 <span id="totalCount">0</span>페이지 · <b>월간 물가자료 2026년 5월호 상</b> · 데모 버전</div>
+  <div class="top-controls">
+    <div class="book-row">
+      <span class="book-label">🏢 조사기관:</span>
+      <button class="book-btn active" data-agency="all">전체</button>
+      <button class="book-btn" data-agency="kpi">물가자료</button>
+    </div>
+    <div class="book-row">
+      <span class="book-label">📅 월간자료:</span>
+      <button class="book-btn active" data-month="all">전체</button>
+      <button class="book-btn" data-month="2026-05">월간 물가자료 2026년 5월호 상</button>
+    </div>
+    <div class="book-row" id="catRow">
+      <span class="book-label">📦 자재분류:</span>
+      <button class="cat-btn active" data-cat="all">전체</button>
+    </div>
+    <div class="search-bar">
+      <a class="back-btn" id="backBtn" href="#" onclick="event.preventDefault(); goBackToToc();">← 표준품셈으로</a>
+      <input type="text" id="searchInput" placeholder="검색: p.23 / 키워드 / 카테고리" autocomplete="off">
+      <div class="count" id="visibleCount">0개 표시</div>
+    </div>
+  </div>
+</header>
+<main>
+  <nav id="sidebar"></nav>
+  <section id="viewer">
+    <div class="placeholder">
+      ← 왼쪽 목록에서 페이지를 선택하세요.<br>
+      자재분류 버튼으로 카테고리별로 필터링할 수 있습니다.<br>
+      <span style="font-size:12px;color:#888;display:block;margin-top:14px;">※ 현재 카테고리는 데모용 임시 매핑입니다. 정확한 분류는 PDF 페이지를 확인 후 조정 요청해주세요.</span>
+    </div>
+  </section>
+</main>
+
+<button class="nav-arrow prev" id="navPrev" title="이전 페이지 (←)"><span>◀</span><span class="lbl">이전</span></button>
+<button class="nav-arrow next" id="navNext" title="다음 페이지 (→)"><span>▶</span><span class="lbl">다음</span></button>
+
+<div class="float-toolbar" id="floatToolbar">
+  <button class="ft-collapse" id="ftCollapse">▾ 접기</button>
+  <div class="ft-header">🎨 색칠 도구</div>
+  <span class="lbl">색상</span>
+  <div class="swatch-row">
+    <span class="swatch active" data-color="#ffd400" style="background:#ffd400"></span>
+    <span class="swatch" data-color="#ff2d2d" style="background:#ff2d2d"></span>
+    <span class="swatch" data-color="#ff8800" style="background:#ff8800"></span>
+    <span class="swatch" data-color="#22c55e" style="background:#22c55e"></span>
+    <span class="swatch" data-color="#2563ea" style="background:#2563ea"></span>
+    <span class="swatch" data-color="#000000" style="background:#000000"></span>
+  </div>
+  <hr>
+  <span class="lbl">굵기</span>
+  <select id="ftSize">
+    <option value="3">얇게</option>
+    <option value="6" selected>보통</option>
+    <option value="15">두껍게</option>
+    <option value="30">매우 두껍게</option>
+  </select>
+  <span class="lbl">불투명도 <span class="op-val" id="ftOpVal">50%</span></span>
+  <div class="opacity-wrap">
+    <input type="range" id="ftOpacity" min="5" max="100" value="50" step="5">
+  </div>
+  <hr>
+  <span class="lbl">🔍 이미지 크기 <span class="op-val" id="ftZoomVal">64%</span></span>
+  <div class="opacity-wrap">
+    <button class="zoom-btn" id="zoomOut">－</button>
+    <input type="range" id="ftZoom" min="30" max="100" value="64" step="2">
+    <button class="zoom-btn" id="zoomIn">＋</button>
+  </div>
+  <button class="tool" id="zoomReset" style="font-size:11px;padding:4px 8px;">크기 초기화 (64%)</button>
+  <hr>
+  <button class="tool" data-tool="pen">✏️ 펜</button>
+  <button class="tool" data-tool="highlighter">🖍️ 형광펜</button>
+  <button class="tool" data-tool="eraser">🧽 지우개</button>
+  <div style="font-size:10px;color:#888;text-align:center;margin-top:-4px;">도구 다시 클릭 시 OFF</div>
+  <div class="hint">
+    💡 <b>Shift</b>: 수평/수직선<br>
+    💡 <b>Ctrl+Z</b>: 되돌리기<br>
+    💡 <b>Del</b>: 페이지 전체 지우기<br>
+    💡 <b>← / →</b>: 이전/다음 페이지<br>
+    💡 <b>+ / －</b>: 이미지 확대/축소
+  </div>
+</div>
+
+<script>
+function goBackToToc() {
+  // 1) 새 탭으로 열린 경우: 부모 탭 포커스 + 자기 탭 닫기
+  if (window.opener && !window.opener.closed) {
+    try { window.opener.focus(); window.close(); return; } catch(e) {}
+  }
+  // 2) 영어 alias (호스팅 환경 안전)
+  // 3) 한글 파일명 fallback
+  const tryUrls = ['index.html', 'standard.html', encodeURI('표준품셈_통합목차.html')];
+  // 같은 탭 이동: 가장 먼저 시도
+  window.location.href = tryUrls[0];
+}
+
+const SECTIONS = [{"page": 1, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.1", "title": "🏗️ 전선·케이블 · 1페이지"}, {"page": 2, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.2", "title": "🏗️ 전선·케이블 · 2페이지"}, {"page": 3, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.3", "title": "🏗️ 전선·케이블 · 3페이지"}, {"page": 4, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.4", "title": "🏗️ 전선·케이블 · 4페이지"}, {"page": 5, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.5", "title": "🏗️ 전선·케이블 · 5페이지"}, {"page": 6, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.6", "title": "🏗️ 전선·케이블 · 6페이지"}, {"page": 7, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.7", "title": "🏗️ 전선·케이블 · 7페이지"}, {"page": 8, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.8", "title": "🏗️ 전선·케이블 · 8페이지"}, {"page": 9, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.9", "title": "🏗️ 전선·케이블 · 9페이지"}, {"page": 10, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.10", "title": "🏗️ 전선·케이블 · 10페이지"}, {"page": 11, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.11", "title": "🏗️ 전선·케이블 · 11페이지"}, {"page": 12, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.12", "title": "🏗️ 전선·케이블 · 12페이지"}, {"page": 13, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.13", "title": "🏗️ 전선·케이블 · 13페이지"}, {"page": 14, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.14", "title": "🏗️ 전선·케이블 · 14페이지"}, {"page": 15, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.15", "title": "🏗️ 전선·케이블 · 15페이지"}, {"page": 16, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.16", "title": "🏗️ 전선·케이블 · 16페이지"}, {"page": 17, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.17", "title": "🏗️ 전선·케이블 · 17페이지"}, {"page": 18, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.18", "title": "🏗️ 전선·케이블 · 18페이지"}, {"page": 19, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.19", "title": "🏗️ 전선·케이블 · 19페이지"}, {"page": 20, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.20", "title": "🏗️ 전선·케이블 · 20페이지"}, {"page": 21, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.21", "title": "🏗️ 전선·케이블 · 21페이지"}, {"page": 22, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.22", "title": "🏗️ 전선·케이블 · 22페이지"}, {"page": 23, "cat_id": "cable", "cat_name": "전선·케이블", "section": "p.23", "title": "🏗️ 전선·케이블 · 23페이지"}, {"page": 24, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.24", "title": "🛠️ 전선접속·관로재 · 24페이지"}, {"page": 25, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.25", "title": "🛠️ 전선접속·관로재 · 25페이지"}, {"page": 26, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.26", "title": "🛠️ 전선접속·관로재 · 26페이지"}, {"page": 27, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.27", "title": "🛠️ 전선접속·관로재 · 27페이지"}, {"page": 28, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.28", "title": "🛠️ 전선접속·관로재 · 28페이지"}, {"page": 29, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.29", "title": "🛠️ 전선접속·관로재 · 29페이지"}, {"page": 30, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.30", "title": "🛠️ 전선접속·관로재 · 30페이지"}, {"page": 31, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.31", "title": "🛠️ 전선접속·관로재 · 31페이지"}, {"page": 32, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.32", "title": "🛠️ 전선접속·관로재 · 32페이지"}, {"page": 33, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.33", "title": "🛠️ 전선접속·관로재 · 33페이지"}, {"page": 34, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.34", "title": "🛠️ 전선접속·관로재 · 34페이지"}, {"page": 35, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.35", "title": "🛠️ 전선접속·관로재 · 35페이지"}, {"page": 36, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.36", "title": "🛠️ 전선접속·관로재 · 36페이지"}, {"page": 37, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.37", "title": "🛠️ 전선접속·관로재 · 37페이지"}, {"page": 38, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.38", "title": "🛠️ 전선접속·관로재 · 38페이지"}, {"page": 39, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.39", "title": "🛠️ 전선접속·관로재 · 39페이지"}, {"page": 40, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.40", "title": "🛠️ 전선접속·관로재 · 40페이지"}, {"page": 41, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.41", "title": "🛠️ 전선접속·관로재 · 41페이지"}, {"page": 42, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.42", "title": "🛠️ 전선접속·관로재 · 42페이지"}, {"page": 43, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.43", "title": "🛠️ 전선접속·관로재 · 43페이지"}, {"page": 44, "cat_id": "connect", "cat_name": "전선접속·관로재", "section": "p.44", "title": "🛠️ 전선접속·관로재 · 44페이지"}, {"page": 45, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.45", "title": "⚡ 전력·배전기기 · 45페이지"}, {"page": 46, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.46", "title": "⚡ 전력·배전기기 · 46페이지"}, {"page": 47, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.47", "title": "⚡ 전력·배전기기 · 47페이지"}, {"page": 48, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.48", "title": "⚡ 전력·배전기기 · 48페이지"}, {"page": 49, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.49", "title": "⚡ 전력·배전기기 · 49페이지"}, {"page": 50, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.50", "title": "⚡ 전력·배전기기 · 50페이지"}, {"page": 51, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.51", "title": "⚡ 전력·배전기기 · 51페이지"}, {"page": 52, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.52", "title": "⚡ 전력·배전기기 · 52페이지"}, {"page": 53, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.53", "title": "⚡ 전력·배전기기 · 53페이지"}, {"page": 54, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.54", "title": "⚡ 전력·배전기기 · 54페이지"}, {"page": 55, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.55", "title": "⚡ 전력·배전기기 · 55페이지"}, {"page": 56, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.56", "title": "⚡ 전력·배전기기 · 56페이지"}, {"page": 57, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.57", "title": "⚡ 전력·배전기기 · 57페이지"}, {"page": 58, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.58", "title": "⚡ 전력·배전기기 · 58페이지"}, {"page": 59, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.59", "title": "⚡ 전력·배전기기 · 59페이지"}, {"page": 60, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.60", "title": "⚡ 전력·배전기기 · 60페이지"}, {"page": 61, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.61", "title": "⚡ 전력·배전기기 · 61페이지"}, {"page": 62, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.62", "title": "⚡ 전력·배전기기 · 62페이지"}, {"page": 63, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.63", "title": "⚡ 전력·배전기기 · 63페이지"}, {"page": 64, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.64", "title": "⚡ 전력·배전기기 · 64페이지"}, {"page": 65, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.65", "title": "⚡ 전력·배전기기 · 65페이지"}, {"page": 66, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.66", "title": "⚡ 전력·배전기기 · 66페이지"}, {"page": 67, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.67", "title": "⚡ 전력·배전기기 · 67페이지"}, {"page": 68, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.68", "title": "⚡ 전력·배전기기 · 68페이지"}, {"page": 69, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.69", "title": "⚡ 전력·배전기기 · 69페이지"}, {"page": 70, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.70", "title": "⚡ 전력·배전기기 · 70페이지"}, {"page": 71, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.71", "title": "⚡ 전력·배전기기 · 71페이지"}, {"page": 72, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.72", "title": "⚡ 전력·배전기기 · 72페이지"}, {"page": 73, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.73", "title": "⚡ 전력·배전기기 · 73페이지"}, {"page": 74, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.74", "title": "⚡ 전력·배전기기 · 74페이지"}, {"page": 75, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.75", "title": "⚡ 전력·배전기기 · 75페이지"}, {"page": 76, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.76", "title": "⚡ 전력·배전기기 · 76페이지"}, {"page": 77, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.77", "title": "⚡ 전력·배전기기 · 77페이지"}, {"page": 78, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.78", "title": "⚡ 전력·배전기기 · 78페이지"}, {"page": 79, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.79", "title": "⚡ 전력·배전기기 · 79페이지"}, {"page": 80, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.80", "title": "⚡ 전력·배전기기 · 80페이지"}, {"page": 81, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.81", "title": "⚡ 전력·배전기기 · 81페이지"}, {"page": 82, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.82", "title": "⚡ 전력·배전기기 · 82페이지"}, {"page": 83, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.83", "title": "⚡ 전력·배전기기 · 83페이지"}, {"page": 84, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.84", "title": "⚡ 전력·배전기기 · 84페이지"}, {"page": 85, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.85", "title": "⚡ 전력·배전기기 · 85페이지"}, {"page": 86, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.86", "title": "⚡ 전력·배전기기 · 86페이지"}, {"page": 87, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.87", "title": "⚡ 전력·배전기기 · 87페이지"}, {"page": 88, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.88", "title": "⚡ 전력·배전기기 · 88페이지"}, {"page": 89, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.89", "title": "⚡ 전력·배전기기 · 89페이지"}, {"page": 90, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.90", "title": "⚡ 전력·배전기기 · 90페이지"}, {"page": 91, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.91", "title": "⚡ 전력·배전기기 · 91페이지"}, {"page": 92, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.92", "title": "⚡ 전력·배전기기 · 92페이지"}, {"page": 93, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.93", "title": "⚡ 전력·배전기기 · 93페이지"}, {"page": 94, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.94", "title": "⚡ 전력·배전기기 · 94페이지"}, {"page": 95, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.95", "title": "⚡ 전력·배전기기 · 95페이지"}, {"page": 96, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.96", "title": "⚡ 전력·배전기기 · 96페이지"}, {"page": 97, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.97", "title": "⚡ 전력·배전기기 · 97페이지"}, {"page": 98, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.98", "title": "⚡ 전력·배전기기 · 98페이지"}, {"page": 99, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.99", "title": "⚡ 전력·배전기기 · 99페이지"}, {"page": 100, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.100", "title": "⚡ 전력·배전기기 · 100페이지"}, {"page": 101, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.101", "title": "⚡ 전력·배전기기 · 101페이지"}, {"page": 102, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.102", "title": "⚡ 전력·배전기기 · 102페이지"}, {"page": 103, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.103", "title": "⚡ 전력·배전기기 · 103페이지"}, {"page": 104, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.104", "title": "⚡ 전력·배전기기 · 104페이지"}, {"page": 105, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.105", "title": "⚡ 전력·배전기기 · 105페이지"}, {"page": 106, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.106", "title": "⚡ 전력·배전기기 · 106페이지"}, {"page": 107, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.107", "title": "⚡ 전력·배전기기 · 107페이지"}, {"page": 108, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.108", "title": "⚡ 전력·배전기기 · 108페이지"}, {"page": 109, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.109", "title": "⚡ 전력·배전기기 · 109페이지"}, {"page": 110, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.110", "title": "⚡ 전력·배전기기 · 110페이지"}, {"page": 111, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.111", "title": "⚡ 전력·배전기기 · 111페이지"}, {"page": 112, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.112", "title": "⚡ 전력·배전기기 · 112페이지"}, {"page": 113, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.113", "title": "⚡ 전력·배전기기 · 113페이지"}, {"page": 114, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.114", "title": "⚡ 전력·배전기기 · 114페이지"}, {"page": 115, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.115", "title": "⚡ 전력·배전기기 · 115페이지"}, {"page": 116, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.116", "title": "⚡ 전력·배전기기 · 116페이지"}, {"page": 117, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.117", "title": "⚡ 전력·배전기기 · 117페이지"}, {"page": 118, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.118", "title": "⚡ 전력·배전기기 · 118페이지"}, {"page": 119, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.119", "title": "⚡ 전력·배전기기 · 119페이지"}, {"page": 120, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.120", "title": "⚡ 전력·배전기기 · 120페이지"}, {"page": 121, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.121", "title": "⚡ 전력·배전기기 · 121페이지"}, {"page": 122, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.122", "title": "⚡ 전력·배전기기 · 122페이지"}, {"page": 123, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.123", "title": "⚡ 전력·배전기기 · 123페이지"}, {"page": 124, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.124", "title": "⚡ 전력·배전기기 · 124페이지"}, {"page": 125, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.125", "title": "⚡ 전력·배전기기 · 125페이지"}, {"page": 126, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.126", "title": "⚡ 전력·배전기기 · 126페이지"}, {"page": 127, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.127", "title": "⚡ 전력·배전기기 · 127페이지"}, {"page": 128, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.128", "title": "⚡ 전력·배전기기 · 128페이지"}, {"page": 129, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.129", "title": "⚡ 전력·배전기기 · 129페이지"}, {"page": 130, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.130", "title": "⚡ 전력·배전기기 · 130페이지"}, {"page": 131, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.131", "title": "⚡ 전력·배전기기 · 131페이지"}, {"page": 132, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.132", "title": "⚡ 전력·배전기기 · 132페이지"}, {"page": 133, "cat_id": "power", "cat_name": "전력·배전기기", "section": "p.133", "title": "⚡ 전력·배전기기 · 133페이지"}, {"page": 134, "cat_id": "wiring", "cat_name": "배선기구", "section": "p.134", "title": "🔌 배선기구 · 134페이지"}, {"page": 135, "cat_id": "wiring", "cat_name": "배선기구", "section": "p.135", "title": "🔌 배선기구 · 135페이지"}, {"page": 136, "cat_id": "wiring", "cat_name": "배선기구", "section": "p.136", "title": "🔌 배선기구 · 136페이지"}, {"page": 137, "cat_id": "wiring", "cat_name": "배선기구", "section": "p.137", "title": "🔌 배선기구 · 137페이지"}, {"page": 138, "cat_id": "wiring", "cat_name": "배선기구", "section": "p.138", "title": "🔌 배선기구 · 138페이지"}, {"page": 139, "cat_id": "light", "cat_name": "조명기구", "section": "p.139", "title": "💡 조명기구 · 139페이지"}, {"page": 140, "cat_id": "light", "cat_name": "조명기구", "section": "p.140", "title": "💡 조명기구 · 140페이지"}, {"page": 141, "cat_id": "light", "cat_name": "조명기구", "section": "p.141", "title": "💡 조명기구 · 141페이지"}, {"page": 142, "cat_id": "light", "cat_name": "조명기구", "section": "p.142", "title": "💡 조명기구 · 142페이지"}, {"page": 143, "cat_id": "light", "cat_name": "조명기구", "section": "p.143", "title": "💡 조명기구 · 143페이지"}, {"page": 144, "cat_id": "light", "cat_name": "조명기구", "section": "p.144", "title": "💡 조명기구 · 144페이지"}, {"page": 145, "cat_id": "light", "cat_name": "조명기구", "section": "p.145", "title": "💡 조명기구 · 145페이지"}, {"page": 146, "cat_id": "light", "cat_name": "조명기구", "section": "p.146", "title": "💡 조명기구 · 146페이지"}, {"page": 147, "cat_id": "light", "cat_name": "조명기구", "section": "p.147", "title": "💡 조명기구 · 147페이지"}, {"page": 148, "cat_id": "light", "cat_name": "조명기구", "section": "p.148", "title": "💡 조명기구 · 148페이지"}, {"page": 149, "cat_id": "light", "cat_name": "조명기구", "section": "p.149", "title": "💡 조명기구 · 149페이지"}, {"page": 150, "cat_id": "light", "cat_name": "조명기구", "section": "p.150", "title": "💡 조명기구 · 150페이지"}, {"page": 151, "cat_id": "light", "cat_name": "조명기구", "section": "p.151", "title": "💡 조명기구 · 151페이지"}, {"page": 152, "cat_id": "light", "cat_name": "조명기구", "section": "p.152", "title": "💡 조명기구 · 152페이지"}, {"page": 153, "cat_id": "light", "cat_name": "조명기구", "section": "p.153", "title": "💡 조명기구 · 153페이지"}, {"page": 154, "cat_id": "light", "cat_name": "조명기구", "section": "p.154", "title": "💡 조명기구 · 154페이지"}, {"page": 155, "cat_id": "light", "cat_name": "조명기구", "section": "p.155", "title": "💡 조명기구 · 155페이지"}, {"page": 156, "cat_id": "light", "cat_name": "조명기구", "section": "p.156", "title": "💡 조명기구 · 156페이지"}, {"page": 157, "cat_id": "light", "cat_name": "조명기구", "section": "p.157", "title": "💡 조명기구 · 157페이지"}, {"page": 158, "cat_id": "light", "cat_name": "조명기구", "section": "p.158", "title": "💡 조명기구 · 158페이지"}, {"page": 159, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.159", "title": "⚠️ 외선자재 · 159페이지"}, {"page": 160, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.160", "title": "⚠️ 외선자재 · 160페이지"}, {"page": 161, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.161", "title": "⚠️ 외선자재 · 161페이지"}, {"page": 162, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.162", "title": "⚠️ 외선자재 · 162페이지"}, {"page": 163, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.163", "title": "⚠️ 외선자재 · 163페이지"}, {"page": 164, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.164", "title": "⚠️ 외선자재 · 164페이지"}, {"page": 165, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.165", "title": "⚠️ 외선자재 · 165페이지"}, {"page": 166, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.166", "title": "⚠️ 외선자재 · 166페이지"}, {"page": 167, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.167", "title": "⚠️ 외선자재 · 167페이지"}, {"page": 168, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.168", "title": "⚠️ 외선자재 · 168페이지"}, {"page": 169, "cat_id": "outdoor", "cat_name": "외선자재", "section": "p.169", "title": "⚠️ 외선자재 · 169페이지"}, {"page": 170, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.170", "title": "📡 방송·통신자재 · 170페이지"}, {"page": 171, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.171", "title": "📡 방송·통신자재 · 171페이지"}, {"page": 172, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.172", "title": "📡 방송·통신자재 · 172페이지"}, {"page": 173, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.173", "title": "📡 방송·통신자재 · 173페이지"}, {"page": 174, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.174", "title": "📡 방송·통신자재 · 174페이지"}, {"page": 175, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.175", "title": "📡 방송·통신자재 · 175페이지"}, {"page": 176, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.176", "title": "📡 방송·통신자재 · 176페이지"}, {"page": 177, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.177", "title": "📡 방송·통신자재 · 177페이지"}, {"page": 178, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.178", "title": "📡 방송·통신자재 · 178페이지"}, {"page": 179, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.179", "title": "📡 방송·통신자재 · 179페이지"}, {"page": 180, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.180", "title": "📡 방송·통신자재 · 180페이지"}, {"page": 181, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.181", "title": "📡 방송·통신자재 · 181페이지"}, {"page": 182, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.182", "title": "📡 방송·통신자재 · 182페이지"}, {"page": 183, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.183", "title": "📡 방송·통신자재 · 183페이지"}, {"page": 184, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.184", "title": "📡 방송·통신자재 · 184페이지"}, {"page": 185, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.185", "title": "📡 방송·통신자재 · 185페이지"}, {"page": 186, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.186", "title": "📡 방송·통신자재 · 186페이지"}, {"page": 187, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.187", "title": "📡 방송·통신자재 · 187페이지"}, {"page": 188, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.188", "title": "📡 방송·통신자재 · 188페이지"}, {"page": 189, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.189", "title": "📡 방송·통신자재 · 189페이지"}, {"page": 190, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.190", "title": "📡 방송·통신자재 · 190페이지"}, {"page": 191, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.191", "title": "📡 방송·통신자재 · 191페이지"}, {"page": 192, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.192", "title": "📡 방송·통신자재 · 192페이지"}, {"page": 193, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.193", "title": "📡 방송·통신자재 · 193페이지"}, {"page": 194, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.194", "title": "📡 방송·통신자재 · 194페이지"}, {"page": 195, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.195", "title": "📡 방송·통신자재 · 195페이지"}, {"page": 196, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.196", "title": "📡 방송·통신자재 · 196페이지"}, {"page": 197, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.197", "title": "📡 방송·통신자재 · 197페이지"}, {"page": 198, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.198", "title": "📡 방송·통신자재 · 198페이지"}, {"page": 199, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.199", "title": "📡 방송·통신자재 · 199페이지"}, {"page": 200, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.200", "title": "📡 방송·통신자재 · 200페이지"}, {"page": 201, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.201", "title": "📡 방송·통신자재 · 201페이지"}, {"page": 202, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.202", "title": "📡 방송·통신자재 · 202페이지"}, {"page": 203, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.203", "title": "📡 방송·통신자재 · 203페이지"}, {"page": 204, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.204", "title": "📡 방송·통신자재 · 204페이지"}, {"page": 205, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.205", "title": "📡 방송·통신자재 · 205페이지"}, {"page": 206, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.206", "title": "📡 방송·통신자재 · 206페이지"}, {"page": 207, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.207", "title": "📡 방송·통신자재 · 207페이지"}, {"page": 208, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.208", "title": "📡 방송·통신자재 · 208페이지"}, {"page": 209, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.209", "title": "📡 방송·통신자재 · 209페이지"}, {"page": 210, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.210", "title": "📡 방송·통신자재 · 210페이지"}, {"page": 211, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.211", "title": "📡 방송·통신자재 · 211페이지"}, {"page": 212, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.212", "title": "📡 방송·통신자재 · 212페이지"}, {"page": 213, "cat_id": "comm", "cat_name": "방송·통신자재", "section": "p.213", "title": "📡 방송·통신자재 · 213페이지"}, {"page": 214, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.214", "title": "🔋 전광판·축전지 · 214페이지"}, {"page": 215, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.215", "title": "🔋 전광판·축전지 · 215페이지"}, {"page": 216, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.216", "title": "🔋 전광판·축전지 · 216페이지"}, {"page": 217, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.217", "title": "🔋 전광판·축전지 · 217페이지"}, {"page": 218, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.218", "title": "🔋 전광판·축전지 · 218페이지"}, {"page": 219, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.219", "title": "🔋 전광판·축전지 · 219페이지"}, {"page": 220, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.220", "title": "🔋 전광판·축전지 · 220페이지"}, {"page": 221, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.221", "title": "🔋 전광판·축전지 · 221페이지"}, {"page": 222, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.222", "title": "🔋 전광판·축전지 · 222페이지"}, {"page": 223, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.223", "title": "🔋 전광판·축전지 · 223페이지"}, {"page": 224, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.224", "title": "🔋 전광판·축전지 · 224페이지"}, {"page": 225, "cat_id": "battery", "cat_name": "전광판·축전지", "section": "p.225", "title": "🔋 전광판·축전지 · 225페이지"}];
+const CATEGORIES = [{"id": "cable", "name": "전선·케이블", "pages": [1, 23], "icon": "🏗️"}, {"id": "connect", "name": "전선접속·관로재", "pages": [24, 44], "icon": "🛠️"}, {"id": "power", "name": "전력·배전기기", "pages": [45, 133], "icon": "⚡"}, {"id": "wiring", "name": "배선기구", "pages": [134, 138], "icon": "🔌"}, {"id": "light", "name": "조명기구", "pages": [139, 158], "icon": "💡"}, {"id": "outdoor", "name": "외선자재", "pages": [159, 169], "icon": "⚠️"}, {"id": "comm", "name": "방송·통신자재", "pages": [170, 213], "icon": "📡"}, {"id": "battery", "name": "전광판·축전지", "pages": [214, 225], "icon": "🔋"}];
+
+const sidebar = document.getElementById('sidebar');
+const viewer = document.getElementById('viewer');
+const searchInput = document.getElementById('searchInput');
+const totalCount = document.getElementById('totalCount');
+const visibleCount = document.getElementById('visibleCount');
+const catRow = document.getElementById('catRow');
+
+totalCount.textContent = SECTIONS.length;
+
+// 카테고리 버튼 동적 생성
+CATEGORIES.forEach(c => {
+  const b = document.createElement('button');
+  b.className = 'cat-btn';
+  b.dataset.cat = c.id;
+  b.textContent = c.icon + ' ' + c.name;
+  catRow.appendChild(b);
+});
+
+let activeCat = 'all';
+let currentIdx = -1;
+let activeAnno = null;
+
+const drawState = { color: '#ffd400', size: 6, opacity: 0.5, tool: 'none' };
+const OPACITY_SCALE = 0.5;
+
+function setActiveAnno(anno) {
+  if (activeAnno && activeAnno.wrapper) activeAnno.wrapper.classList.remove('active-anno');
+  activeAnno = anno;
+  if (activeAnno && activeAnno.wrapper) activeAnno.wrapper.classList.add('active-anno');
+}
+
+function buildSidebar() {
+  sidebar.innerHTML = '';
+  let lastCat = null;
+  SECTIONS.forEach((s, idx) => {
+    if (s.cat_id !== lastCat) {
+      const cat = CATEGORIES.find(c => c.id === s.cat_id);
+      const d = document.createElement('div');
+      d.className = 'chapter-divider';
+      d.dataset.cat = s.cat_id;
+      d.textContent = (cat ? cat.icon + ' ' : '') + s.cat_name;
+      sidebar.appendChild(d);
+      lastCat = s.cat_id;
+    }
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.dataset.idx = idx;
+    div.dataset.cat = s.cat_id;
+    div.dataset.search = (s.section + ' ' + s.cat_name + ' p' + s.page).toLowerCase();
+    div.innerHTML = '<span class="id">' + s.section + '</span><span class="title">' + s.title + '</span>';
+    div.addEventListener('click', () => showSection(idx));
+    sidebar.appendChild(div);
+  });
+  applyFilter();
+}
+
+function applyFilter() {
+  const q = searchInput.value.trim().toLowerCase();
+  let any = false;
+  sidebar.querySelectorAll('.chapter-divider').forEach(d => {
+    if (activeCat === 'all' || d.dataset.cat === activeCat) d.classList.remove('hidden');
+    else d.classList.add('hidden');
+  });
+  sidebar.querySelectorAll('.item').forEach(el => {
+    const catMatch = (activeCat === 'all' || el.dataset.cat === activeCat);
+    const qMatch = (!q || el.dataset.search.includes(q));
+    if (catMatch && qMatch) { el.classList.remove('hidden'); any = true; }
+    else el.classList.add('hidden');
+  });
+  visibleCount.textContent = sidebar.querySelectorAll('.item:not(.hidden)').length + '개 표시';
+  const noRes = sidebar.querySelector('.no-results');
+  if (noRes) noRes.remove();
+  if (!any) {
+    const div = document.createElement('div');
+    div.className = 'no-results';
+    div.textContent = '검색 결과가 없습니다.';
+    sidebar.appendChild(div);
+  }
+  updateNavButtons();
+}
+
+function getVisibleIndices() {
+  const arr = [];
+  sidebar.querySelectorAll('.item:not(.hidden)').forEach(el => arr.push(parseInt(el.dataset.idx, 10)));
+  return arr;
+}
+function updateNavButtons() {
+  const vis = getVisibleIndices();
+  const pos = vis.indexOf(currentIdx);
+  document.getElementById('navPrev').disabled = (pos <= 0);
+  document.getElementById('navNext').disabled = (pos < 0 || pos >= vis.length - 1);
+}
+function gotoPrev() { const vis=getVisibleIndices(); const p=vis.indexOf(currentIdx); if (p>0) showSection(vis[p-1]); }
+function gotoNext() { const vis=getVisibleIndices(); const p=vis.indexOf(currentIdx); if (p>=0&&p<vis.length-1) showSection(vis[p+1]); }
+
+function showSection(idx) {
+  currentIdx = idx;
+  setActiveAnno(null);
+  sidebar.querySelectorAll('.item').forEach(el => el.classList.remove('active'));
+  const activeEl = sidebar.querySelector('.item[data-idx="' + idx + '"]');
+  if (activeEl) { activeEl.classList.add('active'); activeEl.scrollIntoView({ behavior:'smooth', block:'nearest' }); }
+  const s = SECTIONS[idx];
+  const cat = CATEGORIES.find(c => c.id === s.cat_id);
+  viewer.innerHTML = '';
+  const header = document.createElement('div');
+  header.className = 'section-header';
+  header.innerHTML = '<span class="sec-id">' + (cat?cat.icon:'') + ' ' + s.cat_name + '</span>' + s.section + ' <span style="float:right;font-weight:400;font-size:12px;color:#666">2026.05</span>';
+  viewer.appendChild(header);
+  viewer.appendChild(createPageBlock(s));
+  viewer.scrollTop = 0;
+  updateNavButtons();
+}
+
+function createPageBlock(s) {
+  const block = document.createElement('div');
+  block.className = 'page-block';
+  const label = document.createElement('div');
+  label.className = 'page-label';
+  label.textContent = '2026.05 · ' + s.section;
+  block.appendChild(label);
+  block.appendChild(document.createElement('br'));
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'page-wrapper';
+  const img = document.createElement('img');
+  img.src = 'danga_pages/p' + String(s.page).padStart(3, '0') + '.jpg';
+  img.alt = s.section;
+  img.loading = 'lazy';
+  const canvas = document.createElement('canvas');
+  wrapper.appendChild(img);
+  wrapper.appendChild(canvas);
+  const actions = document.createElement('div');
+  actions.className = 'page-actions';
+  actions.innerHTML = '<button class="undo" title="실행취소 (Ctrl+Z)">↶</button><button class="clear" title="전체지우기 (Del)">🗑️</button><button class="dl-btn" title="이미지 다운로드">💾</button>';
+  wrapper.appendChild(actions);
+  block.appendChild(wrapper);
+
+  const setup = () => setupAnnotation(img, canvas, actions, wrapper, s);
+  if (img.complete && img.naturalWidth > 0) setup();
+  else img.addEventListener('load', setup);
+  return block;
+}
+
+function setupAnnotation(img, canvas, actions, wrapper, sec) {
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  const local = { drawing:false, history:[], lastX:0, lastY:0, shiftMode:false, shiftAnchorX:0, shiftAnchorY:0, preShiftSnapshot:null };
+  function getCoords(cx,cy){const r=canvas.getBoundingClientRect();return{x:(cx-r.left)*(canvas.width/r.width),y:(cy-r.top)*(canvas.height/r.height)};}
+  function saveState(){try{local.history.push(ctx.getImageData(0,0,canvas.width,canvas.height));if(local.history.length>50)local.history.shift();}catch(e){}}
+  function captureSnapshot(){try{return ctx.getImageData(0,0,canvas.width,canvas.height);}catch(e){return null;}}
+  function applyStyle(){
+    if(drawState.tool==='eraser'){ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=1;ctx.strokeStyle='#000';ctx.lineWidth=drawState.size*3;ctx.lineCap='round';ctx.lineJoin='round';}
+    else if(drawState.tool==='highlighter'){ctx.globalCompositeOperation='source-over';ctx.globalAlpha=drawState.opacity*OPACITY_SCALE;ctx.strokeStyle=drawState.color;ctx.lineWidth=drawState.size*3;ctx.lineCap='butt';ctx.lineJoin='miter';ctx.miterLimit=2;}
+    else{ctx.globalCompositeOperation='source-over';ctx.globalAlpha=drawState.opacity*OPACITY_SCALE;ctx.strokeStyle=drawState.color;ctx.lineWidth=drawState.size;ctx.lineCap='round';ctx.lineJoin='round';}
+  }
+  function doUndo(){if(local.history.length>0)ctx.putImageData(local.history.pop(),0,0);}
+  function doClear(c){if(c&&!confirm('이 페이지의 모든 표시를 지우시겠습니까?'))return;saveState();ctx.clearRect(0,0,canvas.width,canvas.height);}
+  function startDraw(cx,cy,sh){local.drawing=true;saveState();const{x,y}=getCoords(cx,cy);local.lastX=x;local.lastY=y;local.shiftMode=false;local.preShiftSnapshot=null;applyStyle();ctx.beginPath();
+    if(drawState.tool==='highlighter'){const h=ctx.lineWidth/2;ctx.fillStyle=drawState.color;const a=ctx.globalAlpha;ctx.fillRect(x-h,y-h,ctx.lineWidth,ctx.lineWidth);ctx.globalAlpha=a;ctx.beginPath();ctx.moveTo(x,y);}
+    else{ctx.moveTo(x,y);ctx.lineTo(x+0.01,y+0.01);ctx.stroke();}
+    if(sh){local.shiftMode=true;local.shiftAnchorX=x;local.shiftAnchorY=y;local.preShiftSnapshot=captureSnapshot();}
+  }
+  function moveDraw(cx,cy,sh){if(!local.drawing)return;const{x,y}=getCoords(cx,cy);
+    if(sh&&!local.shiftMode){local.shiftMode=true;local.shiftAnchorX=local.lastX;local.shiftAnchorY=local.lastY;local.preShiftSnapshot=captureSnapshot();}
+    else if(!sh&&local.shiftMode){local.shiftMode=false;local.preShiftSnapshot=null;applyStyle();ctx.beginPath();ctx.moveTo(local.lastX,local.lastY);}
+    if(local.shiftMode){if(local.preShiftSnapshot)ctx.putImageData(local.preShiftSnapshot,0,0);const dx=x-local.shiftAnchorX,dy=y-local.shiftAnchorY;let eX=x,eY=y;if(Math.abs(dx)>=Math.abs(dy))eY=local.shiftAnchorY;else eX=local.shiftAnchorX;applyStyle();ctx.beginPath();ctx.moveTo(local.shiftAnchorX,local.shiftAnchorY);ctx.lineTo(eX,eY);ctx.stroke();local.lastX=eX;local.lastY=eY;}
+    else{ctx.lineTo(x,y);ctx.stroke();local.lastX=x;local.lastY=y;}
+  }
+  function endDraw(){local.drawing=false;local.shiftMode=false;local.preShiftSnapshot=null;}
+  function activate(){setActiveAnno({doUndo,doClear,wrapper});}
+
+  if(!activeAnno) activate();
+  canvas.addEventListener('mouseenter', activate);
+  canvas.addEventListener('mousedown',(e)=>{e.preventDefault();activate();startDraw(e.clientX,e.clientY,e.shiftKey);});
+  canvas.addEventListener('mousemove',(e)=>moveDraw(e.clientX,e.clientY,e.shiftKey));
+  canvas.addEventListener('mouseup', endDraw);
+  canvas.addEventListener('mouseleave', endDraw);
+  canvas.addEventListener('touchstart',(e)=>{e.preventDefault();activate();const t=e.touches[0];startDraw(t.clientX,t.clientY,false);});
+  canvas.addEventListener('touchmove',(e)=>{e.preventDefault();const t=e.touches[0];moveDraw(t.clientX,t.clientY,false);});
+  canvas.addEventListener('touchend', endDraw);
+
+  actions.querySelector('.undo').addEventListener('click', () => { activate(); doUndo(); });
+  actions.querySelector('.clear').addEventListener('click', () => { activate(); doClear(true); });
+  actions.querySelector('.dl-btn').addEventListener('click', async () => {
+    activate();
+    const btn = actions.querySelector('.dl-btn');
+    btn.textContent='⏳'; btn.disabled=true;
+    try {
+      const fn = '단가_' + sec.cat_name.replace(/[\\/:*?"<>|·]/g,'_') + '_' + sec.section + '.png';
+      const clean = await tryLoadCleanImage(img.src);
+      const out = document.createElement('canvas');
+      out.width = (clean && clean.naturalWidth) || img.naturalWidth;
+      out.height = (clean && clean.naturalHeight) || img.naturalHeight;
+      const oc = out.getContext('2d');
+      let dl = null;
+      if (clean) { oc.drawImage(clean,0,0); oc.drawImage(canvas,0,0); try{dl=await canvasToBlob(out);}catch(e){} }
+      if (!dl) { try{oc.drawImage(img,0,0);oc.drawImage(canvas,0,0);dl=await canvasToBlob(out);}catch(e){} }
+      if (!dl) { if(confirm('합성 실패. 색칠만 투명 PNG로 받으시겠습니까?')) dl=await canvasToBlob(canvas); else return; }
+      const url = URL.createObjectURL(dl);
+      const a = document.createElement('a');
+      a.href=url; a.download=fn; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 2000);
+    } catch(e) { console.error(e); alert('오류: '+e.message); }
+    finally { btn.textContent='💾'; btn.disabled=false; }
+  });
+}
+
+function imageFromBlob(b){return new Promise((r,j)=>{const u=URL.createObjectURL(b);const i=new Image();i.onload=()=>{r(i);setTimeout(()=>URL.revokeObjectURL(u),5000);};i.onerror=(e)=>{URL.revokeObjectURL(u);j(e);};i.src=u;});}
+function imageFromSrc(s){return new Promise((r,j)=>{const i=new Image();i.onload=()=>r(i);i.onerror=j;i.src=s;});}
+function arrayBufferToBase64(b){const a=new Uint8Array(b);let s='';const C=0x8000;for(let i=0;i<a.length;i+=C)s+=String.fromCharCode.apply(null,a.subarray(i,i+C));return btoa(s);}
+function xhrArrayBuffer(u){return new Promise((r,j)=>{const x=new XMLHttpRequest();x.open('GET',u,true);x.responseType='arraybuffer';x.onload=()=>{if((x.status===200||x.status===0)&&x.response)r(x.response);else j(new Error('XHR '+x.status));};x.onerror=()=>j(new Error('XHR'));x.send();});}
+function canvasToBlob(c){return new Promise((r,j)=>{try{c.toBlob((b)=>b?r(b):j(new Error('null')),'image/png');}catch(e){j(e);}});}
+async function tryLoadCleanImage(src){
+  try{const r=await fetch(src);if(r.ok||r.status===0){const b=await r.blob();if(b.size>0)return await imageFromBlob(b);}}catch(e){}
+  try{const buf=await xhrArrayBuffer(src);const b64=arrayBufferToBase64(buf);return await imageFromSrc('data:image/jpeg;base64,'+b64);}catch(e){}
+  try{return await new Promise((r,j)=>{const i=new Image();i.crossOrigin='anonymous';i.onload=()=>r(i);i.onerror=j;i.src=src;});}catch(e){}
+  return null;
+}
+
+// Filter buttons
+document.querySelectorAll('.book-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    // 같은 그룹(같은 row) 내에서만 active 토글
+    const row = btn.parentElement;
+    row.querySelectorAll('.book-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+
+document.addEventListener('click', (e) => {
+  if (e.target.classList.contains('cat-btn')) {
+    catRow.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+    e.target.classList.add('active');
+    activeCat = e.target.dataset.cat;
+    applyFilter();
+    sidebar.scrollTop = 0;
+    const first = sidebar.querySelector('.item:not(.hidden)');
+    if (first) showSection(parseInt(first.dataset.idx,10));
+  }
+});
+
+searchInput.addEventListener('input', applyFilter);
+searchInput.addEventListener('keydown', (e) => { if (e.key === 'Escape') { searchInput.value=''; applyFilter(); } });
+
+// Toolbar
+const floatTB = document.getElementById('floatToolbar');
+floatTB.querySelectorAll('.swatch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    floatTB.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    sw.classList.add('active');
+    drawState.color = sw.dataset.color;
+    if (drawState.tool === 'none' || drawState.tool === 'eraser') {
+      drawState.tool = 'highlighter';
+      document.body.dataset.tool = 'highlighter';
+      floatTB.querySelectorAll('.tool').forEach(t => t.classList.remove('active'));
+      const b = floatTB.querySelector('.tool[data-tool="highlighter"]');
+      if (b) b.classList.add('active');
+    }
+  });
+});
+function setTool(name) {
+  if (drawState.tool === name && name !== 'none') name = 'none';
+  drawState.tool = name;
+  document.body.dataset.tool = name;
+  floatTB.querySelectorAll('.tool').forEach(t => t.classList.remove('active'));
+  if (name !== 'none') { const b = floatTB.querySelector('.tool[data-tool="' + name + '"]'); if (b) b.classList.add('active'); }
+}
+floatTB.querySelectorAll('.tool[data-tool]').forEach(btn => btn.addEventListener('click', () => setTool(btn.dataset.tool)));
+document.getElementById('ftSize').addEventListener('change', (e) => { drawState.size = parseFloat(e.target.value); });
+document.getElementById('ftOpacity').addEventListener('input', (e) => { const v=parseInt(e.target.value,10); drawState.opacity=v/100; document.getElementById('ftOpVal').textContent=v+'%'; });
+
+const zoomInput = document.getElementById('ftZoom');
+const zoomValLabel = document.getElementById('ftZoomVal');
+function setZoom(v) { v = Math.max(30, Math.min(100, v)); zoomInput.value=v; zoomValLabel.textContent=v+'%'; document.documentElement.style.setProperty('--page-max-w', v+'%'); }
+zoomInput.addEventListener('input',(e)=>setZoom(parseInt(e.target.value,10)));
+document.getElementById('zoomOut').addEventListener('click',()=>setZoom(parseInt(zoomInput.value,10)-4));
+document.getElementById('zoomIn').addEventListener('click',()=>setZoom(parseInt(zoomInput.value,10)+4));
+document.getElementById('zoomReset').addEventListener('click',()=>setZoom(64));
+
+document.getElementById('ftCollapse').addEventListener('click', () => {
+  floatTB.classList.toggle('collapsed');
+  document.getElementById('ftCollapse').textContent = floatTB.classList.contains('collapsed') ? '▴ 펼치기' : '▾ 접기';
+});
+
+document.getElementById('navPrev').addEventListener('click', gotoPrev);
+document.getElementById('navNext').addEventListener('click', gotoNext);
+
+document.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z' || e.key === 'ㅋ')) { e.preventDefault(); if (activeAnno) activeAnno.doUndo(); }
+  else if (e.key === 'Delete' || e.code === 'Delete' || e.keyCode === 46) { e.preventDefault(); if (activeAnno) activeAnno.doClear(true); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); gotoPrev(); }
+  else if (e.key === 'ArrowRight') { e.preventDefault(); gotoNext(); }
+  else if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom(parseInt(zoomInput.value,10)+4); }
+  else if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom(parseInt(zoomInput.value,10)-4); }
+  else if ((e.ctrlKey || e.metaKey) && e.key === '0') { e.preventDefault(); setZoom(64); }
+});
+
+buildSidebar();
+if (SECTIONS.length > 0) showSection(0);
+</script>
+</body>
+</html>
